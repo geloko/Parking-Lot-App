@@ -9,12 +9,12 @@ class BaseInfo(models.Model):
     abstract = True
 
 class MallParking(BaseInfo):
-  num_entries = models.IntegerField(default=3)
-  flat_rate = models.DecimalField(default=40)
-  exceed_rate = models.DecimalField(default=5000)
-  flatRate_duration = models.IntegerField(default=3*60*60) # default is 3 hours (3 * 60 * 60)
-  exceed_duration = models.IntegerField(default=24*60*60) # default is 24 hours (24 * 60 * 60)
-  return_duration = models.IntegerField(default=30*60) # default is 30 minutes (30 * 60)
+  num_entries = models.IntegerField(default=3, blank=True) # cannot be less
+  flat_rate = models.DecimalField(default=40, blank=True) # default is 40 pesos
+  exceed_rate = models.DecimalField(default=5000, blank=True) # default is 5000 pesos
+  flatRate_duration = models.IntegerField(default=10800, blank=True) # default is 3 hours in milliseconds (3 * 60 * 60)
+  exceed_duration = models.IntegerField(default=86400, blank=True) # default is 24 hours in milliseconds (24 * 60 * 60)
+  return_duration = models.IntegerField(default=1800, blank=True) # default is 30 minutes in milliseconds (30 * 60)
 
 class Vehicle(BaseInfo):
   class VehicleType(models.TextChoices):
