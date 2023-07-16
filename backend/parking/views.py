@@ -1,6 +1,6 @@
 from drf_yasg.utils import swagger_auto_schema
 
-from django.shortcuts import render
+from django.http import HttpResponse
 from rest_framework import viewsets, mixins, status
 from rest_framework.response import Response
 
@@ -28,3 +28,8 @@ class BaseViewSet(viewsets.GenericViewSet,
     @swagger_auto_schema(auto_schema=None)
     def update(self, request, *args, **kwargs):
         return Response(status=status.HTTP_403_FORBIDDEN)
+
+
+
+def index(request):
+    return HttpResponse("Hello, world. You're at the polls index.")
