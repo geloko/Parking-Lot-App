@@ -3,7 +3,7 @@ import json
 
 # we use the rest framework for our frontend and backend communications
 
-import models
+from . import models
 
 class MallParkingSerializer(serializers.ModelSerializer):
     class Meta:
@@ -12,7 +12,7 @@ class MallParkingSerializer(serializers.ModelSerializer):
         read_only_fields = ['id']
 
     def validate(self, data):
-        if(data['num_entries'] < 3):
+        if(data.__contains__('num_entries') and data['num_entries'] < 3):
             raise serializers.ValidationError('The number of entries cannot be less than 3.')
         return data
 
@@ -76,4 +76,3 @@ class VehicleParkingSerializer(serializers.ModelSerializer):
         data['vehicle'] = vehicle
 
         # TODO: Validation of the entry and exit datetimes and the is_flat_rate attribute
-    
