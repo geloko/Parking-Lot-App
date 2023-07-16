@@ -1,11 +1,11 @@
 from rest_framework.routers import DefaultRouter
-from django.conf.urls import url
-from django.urls import include
+from django.urls import include, path, re_path
 
-import views
+from . import views
 
 router = DefaultRouter()
 
 urlpatterns = [
-  url(r'', include(router.urls))
+    re_path(r'', include(router.urls)),
+    path("", views.index, name="index")
 ]

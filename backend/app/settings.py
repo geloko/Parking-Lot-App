@@ -38,8 +38,14 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
 
-    #apps
-    'parking'
+    # rest framework
+    'rest_framework',
+
+    # swagger
+    'drf_yasg',
+
+    # apps
+    'parking',
 ]
 
 MIDDLEWARE = [
