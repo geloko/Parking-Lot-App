@@ -1,3 +1,5 @@
+from drf_yasg.utils import swagger_auto_schema
+
 from django.shortcuts import render
 from rest_framework import viewsets, mixins, status
 from rest_framework.response import Response
@@ -23,5 +25,6 @@ class BaseViewSet(viewsets.GenericViewSet,
         return super().retrieve(request, *args, **kwargs)
     
     # disable full object updates so that the requests would always pass through the partial update function
+    @swagger_auto_schema(auto_schema=None)
     def update(self, request, *args, **kwargs):
         return Response(status=status.HTTP_403_FORBIDDEN)
