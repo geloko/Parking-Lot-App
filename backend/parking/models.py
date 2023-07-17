@@ -26,7 +26,7 @@ class Vehicle(BaseInfo):
         S = 'S'
         M = 'M'
         L = 'L'
-    plate_number = models.IntegerField(primary_key=True)
+    plate_number = models.CharField(max_length=255, primary_key=True)
     type = models.CharField(max_length=4, choices=VehicleType.choices)
 
     def __str__(self):
@@ -49,6 +49,9 @@ class ParkingSlot(BaseInfo):
     mall_parking = models.ForeignKey(MallParking, on_delete=models.CASCADE)
     parking_slot_size = models.ForeignKey(ParkingSlotSize, on_delete=models.CASCADE)
     distances = models.TextField() # array of integers in JSON format
+
+    def __str__(self) -> str:
+        return str(self.pk) + " - " + self.parking_slot_size.__str__()
 
 class VehicleParking(BaseInfo):
     entry_index = models.IntegerField() # index of the entry point
