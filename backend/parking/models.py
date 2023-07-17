@@ -14,9 +14,9 @@ class MallParking(BaseInfo):
     num_entries = models.IntegerField(default=3, blank=True) # cannot be less than 3
     flat_rate = models.DecimalField(default=40, blank=True, max_digits=19, decimal_places=10) # default is 40 pesos
     exceed_rate = models.DecimalField(default=5000, blank=True, max_digits=19, decimal_places=10) # default is 5000 pesos
-    flatRate_duration = models.IntegerField(default=10800, blank=True) # default is 3 hours in milliseconds (3 * 60 * 60)
-    exceed_duration = models.IntegerField(default=86400, blank=True) # default is 24 hours in milliseconds (24 * 60 * 60)
-    return_duration = models.IntegerField(default=1800, blank=True) # default is 30 minutes in milliseconds (30 * 60)
+    flatRate_duration = models.IntegerField(default=10800, blank=True) # default is 3 hours in seconds (3 * 60 * 60)
+    exceed_duration = models.IntegerField(default=86400, blank=True) # default is 24 hours in seconds (24 * 60 * 60)
+    return_duration = models.IntegerField(default=1800, blank=True) # default is 30 minutes in seconds (30 * 60)
 
     def __str__(self):
         return self.name
@@ -51,8 +51,57 @@ class ParkingSlot(BaseInfo):
     distances = models.TextField() # array of integers in JSON format
 
 class VehicleParking(BaseInfo):
+    entry_index = models.IntegerField() # index of the entry point
     entry_datetime = models.DateTimeField(auto_now=False, auto_now_add=True)
     exit_datetime = models.DateTimeField(blank=True, null=True)
-    is_flat_rate = models.BooleanField(default=True)
     parking_slot = models.ForeignKey(ParkingSlot, on_delete=models.CASCADE)
     vehicle = models.ForeignKey(Vehicle, on_delete=models.CASCADE)
+
+    # checks if the starting rate is fixed rate or not
+    @property
+    def is_fixed_starting_rate(self):
+        if self.exit_datetime is not None:
+            # get the mall parking instance to see the threshold for a returning car
+            mall_parking = MallParking.objects.get(id=self.parking_slot.mall_parking.pk)
+
+            # get the latest vehicle parking instance from the same vehicle
+            try:
+                latest_parking = VehicleParking.objects.filter(vehicle__id=self.vehicle.pk).latest('exit_datetime')
+
+                # return False if the difference between the last parking and the current entry is less than the return duration threshold
+                if self.entry_datetime.timestamp() - latest_parking.exit_datetime.timestamp() <= mall_parking.return_duration:
+                    return False
+            except VehicleParking.DoesNotExist:
+                # handle the case where there is no pre-existing parking records
+                return True
+        # return True otherwise
+        return True
+
+    # computes the total charge for the parking, returns 0 if the vehicle has not exited yet.
+    @property
+    def total_charge(self):
+        total_fee = 0
+        if self.exit_datetime is not None:
+            # get the mall parking instance to see the corresponding rates for the parking fee
+            mall_parking = MallParking.objects.get(id=self.parking_slot.mall_parking.pk)
+
+            parking_duration = self.exit_datetime.timestamp() - self.entry_datetime.timestamp()
+            if self.is_fixed_starting_rate:
+                # compute the duration that is not covered by the fixed rate
+                non_fixed_rate_duration = parking_duration - mall_parking.flatRate_duration
+
+                # add the fixed rate to the total fee
+                total_fee += mall_parking.flat_rate
+
+                # handle the case when the duration exceeds the flat rate duration
+                if non_fixed_rate_duration > 0:
+                    # get the hourly rate from the parking slot depending on the size
+                    slot_rate = self.parking_slot.parking_slot_size.continuous_rate
+
+                    # add the fee based on the continuous rate to be applied on a per second basis
+                    total_fee += non_fixed_rate_duration * slot_rate / (60 * 60)
+            else:
+                # add the fee based on the continuous rate to be applied on a per second basis
+                total_fee += parking_duration * slot_rate / (60 * 60)
+
+        return total_fee

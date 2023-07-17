@@ -65,8 +65,8 @@ class VehicleParkingSerializer(serializers.ModelSerializer):
     vehicle = VehicleSerializer()
     class Meta:
         model = models.VehicleParking
-        fields = ['id', 'entry_datetime', 'exit_datetime', 'is_flat_rate', 'parking_slot', 'vehicle']
-        read_only_fields = ['id', 'entry_datetime', 'exit_datetime', 'is_flat_rate']
+        fields = ['id', 'entry_datetime', 'exit_datetime', 'parking_slot', 'vehicle', 'is_fixed_starting_rate', 'total_charge']
+        read_only_fields = ['id', 'is_fixed_starting_rate', 'total_charge']
 
     def validate(self, data):
         # make sure that the instances exist in the database
@@ -76,7 +76,9 @@ class VehicleParkingSerializer(serializers.ModelSerializer):
         data['parking_slot'] = parking_slot
         data['vehicle'] = vehicle
 
-        # TODO: Validation of the entry and exit datetimes and the is_flat_rate attribute
+        # check if the exit datetime is after the entry datetime
+        if data['exit_datetime'] is not None and data['entry_datetime'] > data['exit_datetime']:
+            raise serializers.ValidationError('The exit datetime cannot be before the exit datetime.')
 
 class MallParkingSlotsSerializer(serializers.Serializer):
     mall_parking = MallParkingSerializer()
