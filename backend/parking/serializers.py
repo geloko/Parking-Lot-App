@@ -34,7 +34,8 @@ class ParkingSlotSerializer(serializers.ModelSerializer):
     parking_slot_size = ParkingSlotSizeSerializer()
     distances = serializers.ListField(
         child = serializers.IntegerField(min_value=0),
-        min_length = 3 # minimum number entries is 3, therefore the number of distances must be greater than 3
+        min_length = 3, # minimum number entries is 3, therefore the number of distances must be greater than 3
+        write_only=True
     )
     class Meta:
         model = models.ParkingSlot
@@ -76,3 +77,52 @@ class VehicleParkingSerializer(serializers.ModelSerializer):
         data['vehicle'] = vehicle
 
         # TODO: Validation of the entry and exit datetimes and the is_flat_rate attribute
+
+class MallParkingSlotsSerializer(serializers.Serializer):
+    mall_parking = MallParkingSerializer()
+    parking_slots = ParkingSlotSerializer(read_only=True, many=True)
+    parking_slot_distance_list = serializers.ListField(
+        child = serializers.ListField(
+            child = serializers.IntegerField(min_value=0),
+            min_length = 3 # minimum number entries is 3, therefore the number of distances must be greater than 3
+        ),
+        write_only=True
+    )
+    parking_slot_size_list = serializers.ListField(
+        child = serializers.IntegerField(),
+        write_only=True
+    )
+
+    def validate(self, data):
+        # check that the parking slot lists have the same size
+        if(len(data['parking_slot_distance_list']) != len(data['parking_slot_size_list'])):
+            raise serializers.ValidationError('The lists must have the same length.')
+
+        mall_parking = models.MallParking(**data['mall_parking'])
+        data['mall_parking'] = mall_parking
+
+        parking_slots = []
+        for i in range(0, len(data['parking_slot_distance_list'])):
+            # check that the number of distance matches the number of entries in the mall
+            if len(data['parking_slot_distance_list'][i]) != mall_parking.num_entries:
+                raise serializers.ValidationError('Invalid parking slot distances input.')
+            
+            parking_slot_size = models.ParkingSlotSize.objects.get(id=data['parking_slot_size_list'][i])
+            parking_slot_instance = models.ParkingSlot(
+                mall_parking = mall_parking,
+                parking_slot_size = parking_slot_size,
+                distances = data['parking_slot_distance_list'][i]
+            )
+            parking_slots.append(parking_slot_instance)
+        data['parking_slots'] = parking_slots
+
+        return data
+
+    def save(self):
+        mall_parking = self.validated_data['mall_parking']
+        mall_parking.save()
+
+        for i in range(0, len(self.validated_data['parking_slots'])):
+            self.validated_data['parking_slots'][i].save()
+
+        return True
