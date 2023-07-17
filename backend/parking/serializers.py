@@ -103,8 +103,9 @@ class VehicleParkingEntrySerializer(serializers.ModelSerializer):
         """
         # Get the vehicle parking instances occupied parking slots. Null exit datetime indicate occupied.
         occupied_parking_slot_ids = models.VehicleParking.objects.filter(exit_datetime=None).values('parking_slot_id')
-        free_parking_slots = models.ParkingSlot.objects.exclude(id__in=Subquery(occupied_parking_slot_ids))
-
+        valid_parking_slots = models.ParkingSlot.objects.filter(parking_slot_size__value__gte=data['vehicle']['type'])
+        free_parking_slots = valid_parking_slots.exclude(id__in=Subquery(occupied_parking_slot_ids))
+        
         # Querying the empty parking slots like this is computationally expensive. 
         # An alternative that I have thought of is to have an is_occupied attribute in the ParkingSlot.
         # However, it is also not fool proof because that might cause inconsistencies in the data if not updated properly, like if an admin modifies it without using the API.
@@ -125,8 +126,6 @@ class VehicleParkingEntrySerializer(serializers.ModelSerializer):
             if min_distance > distances_arr[entry_index]:
                 parking_slot = free_parking_slot
                 min_distance = json.loads(parking_slot.distances)[entry_index]
-
-
 
         data['parking_slot'] = parking_slot
         data['vehicle'] = vehicle
