@@ -1,0 +1,18 @@
+- model: parking.parkingslotsize
+  pk: 0
+  fields: 
+    name: SP
+    value: 0
+    continuous_rate: 20
+- model: parking.parkingslotsize
+  pk: 1
+  fields: 
+    name: MP
+    value: 1
+    continuous_rate: 60
+- model: parking.parkingslotsize
+  pk: 2
+  fields: 
+    name: LP
+    value: 2
+    continuous_rate: 100

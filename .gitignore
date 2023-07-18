@@ -1,0 +1,9 @@
+.vscode
+.DS_Store
+
+# Django stuff:
+*.log
+*.pyc
+*.sqlite3
+
+__pycache__/
