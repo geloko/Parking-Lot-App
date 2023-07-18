@@ -9,28 +9,31 @@ from . import serializers
 # Base view set for table attributes containing the create, read and update actions but not delete.
 class BaseViewSet(viewsets.GenericViewSet, 
     mixins.ListModelMixin,
-    mixins.CreateModelMixin,
     mixins.RetrieveModelMixin,
+    mixins.CreateModelMixin,
     mixins.UpdateModelMixin
 ):
     def perform_create(self, serializer): 
-        if(serializer.is_valid()):
+        if serializer.is_valid():
             content = serializer.save()
             return Response(content, status=status.HTTP_201_CREATED)
         else:
             content = serializer.errors
             return Response(content, status=status.HTTP_400_BAD_REQUEST)
-            
-    # disable full object updates so that the requests would always pass through the partial update function
-    @swagger_auto_schema(auto_schema=None)
-    def update(self):
-        return Response(status=status.HTTP_403_FORBIDDEN)
 
-class MallParkingViewSet(BaseViewSet):
+class MallParkingViewSet(
+    viewsets.GenericViewSet, 
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin
+):
     queryset = models.MallParking.objects.all()
     serializer_class = serializers.MallParkingSerializer
 
-class VehicleViewSet(BaseViewSet):
+class VehicleViewSet(
+    viewsets.GenericViewSet, 
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin
+):
     queryset = models.Vehicle.objects.all()
     serializer_class = serializers.VehicleSerializer
 
@@ -44,21 +47,33 @@ class ParkingSlotViewSet(BaseViewSet):
 
 class VehicleParkingViewSet(viewsets.GenericViewSet, 
     mixins.ListModelMixin,
-    mixins.RetrieveModelMixin
-):
-    queryset = models.VehicleParking.objects.all()
-    serializer_class = serializers.VehicleParkingSerializer
-
-class VehicleParkingExitViewSet(viewsets.GenericViewSet,
+    mixins.RetrieveModelMixin,
     mixins.UpdateModelMixin
 ):
     queryset = models.VehicleParking.objects.all()
     serializer_class = serializers.VehicleParkingSerializer
 
-    # disable full object updates so that the requests would always pass through the partial update function
-    @swagger_auto_schema(auto_schema=None)
-    def update(self):
-        return Response(status=status.HTTP_403_FORBIDDEN)
+    def update(self, request, *args, **kwargs):
+        # Get the parking slot for the vehicle. We expect there to be only one parking slot containing the vehicle.
+        parking_slot_queryset = models.ParkingSlot.objects.filter(vehicle_parking__vehicle__pk=request.data['plate_number'])
+        if not(parking_slot_queryset.exists()):
+            return Response("Unknown plate number.", status=status.HTTP_400_BAD_REQUEST)
+        parking_slot = parking_slot_queryset.get()
+        vehicle_parking = parking_slot.vehicle_parking
+
+        serializer = self.serializer_class(instance=vehicle_parking, data=request.data)
+        if serializer.is_valid():
+            print("VALIDATED")
+            content = serializer.save()
+            return Response(content, status=status.HTTP_200_OK)
+        else:
+            content = serializer.errors
+            return Response(content, status=status.HTTP_400_BAD_REQUEST)
+
+class VehicleParkingExitViewSet(viewsets.GenericViewSet,
+):
+    queryset = models.VehicleParking.objects.all()
+    serializer_class = serializers.VehicleParkingSerializer
 
 class VehicleParkingEntryViewSet(viewsets.GenericViewSet, 
     mixins.CreateModelMixin,

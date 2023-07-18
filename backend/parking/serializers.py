@@ -1,6 +1,6 @@
 from rest_framework import serializers
 import json
-from django.db.models import Subquery
+from datetime import datetime, timezone
 
 # we use the rest framework for our frontend and backend communications
 
@@ -61,26 +61,122 @@ class ParkingSlotSerializer(serializers.ModelSerializer):
         return data
 
 class VehicleParkingSerializer(serializers.ModelSerializer):
-    parking_slot = ParkingSlotSerializer()
-    vehicle = VehicleSerializer()
+    parking_slot = ParkingSlotSerializer(read_only=True)
+    vehicle = VehicleSerializer(read_only=True)
+    plate_number = serializers.CharField(max_length=255, write_only=True)
+
     class Meta:
         model = models.VehicleParking
-        fields = ['id', 'entry_datetime', 'exit_datetime', 'parking_slot', 'vehicle', 'is_fixed_starting_rate', 'total_charge']
-        read_only_fields = ['id', 'is_fixed_starting_rate', 'total_charge']
+        fields = [
+            'id', 
+            'entry_index', 
+            'entry_datetime', 
+            'exit_datetime', 
+            'parking_slot', 
+            'vehicle', 
+            'is_fixed_starting_rate', 
+            'total_charge',
+            'plate_number'
+        ]
+        read_only_fields = [
+            'id', 
+            'entry_index', 
+            'entry_datetime', 
+            'exit_datetime', 
+            'parking_slot', 
+            'vehicle', 
+            'is_fixed_starting_rate', 
+            'total_charge'
+        ] # all fields except the plate number is read only
 
     def validate(self, data):
-        # make sure that the instances exist in the database
-        parking_slot = models.ParkingSlot.objects.get(id=data['parking_slot'].get['id'])
-        vehicle = models.Vehicle.objects.get(id=data['vehicle'].get['plate_number'])
+        if self.instance is not None:
+            # make sure that the instances exist in the database
+            parking_slot = models.ParkingSlot.objects.get(pk=self.instance.parking_slot.id)
+            vehicle = models.Vehicle.objects.get(pk=self.instance.vehicle.plate_number)
 
-        data['parking_slot'] = parking_slot
-        data['vehicle'] = vehicle
+            data['parking_slot'] = parking_slot
+            data['vehicle'] = vehicle
 
-        # check if the exit datetime is after the entry datetime
-        if data['exit_datetime'] is not None and data['entry_datetime'] > data['exit_datetime']:
-            raise serializers.ValidationError('The exit datetime cannot be before the exit datetime.')
+            if self.instance.exit_datetime is None:
+                data['exit_datetime'] = datetime.now(timezone.utc)
+            else:
+                data['exit_datetime'] = self.instance.exit_datetime
+
+            # check if the exit datetime is after the entry datetime
+            if self.instance.entry_datetime > data['exit_datetime']:
+                raise serializers.ValidationError('The exit datetime cannot be before the exit datetime.')
+        else:
+            # check if the vehicle is already parked
+            vehicle = models.Vehicle(
+                plate_number=data['plate_number'],
+                type=data['type']
+            )
+            entry_index = data['entry_index']
+            """
+            Get all the empty parking slots
+            """
+            # Get the vehicle parking instances occupied parking slots. Null exit datetime indicate occupied.
+            free_parking_slots = models.ParkingSlot.objects.filter(vehicle_parking=None, parking_slot_size__value__gte=data['type'])
+
+            # use the first free parking slot as the initial value
+            parking_slot = free_parking_slots.first()
+
+            if parking_slot is None:
+                raise serializers.ValidationError('No available parking slots.')
+
+            min_distance = json.loads(parking_slot.distances)[entry_index]
+            for free_parking_slot in free_parking_slots:
+                # distances array is saved as a string in json format
+                distances_arr = json.loads(free_parking_slot.distances)
+
+                # set the minimum as the new parking slot and update the current minimum distance
+                if min_distance > distances_arr[entry_index]:
+                    parking_slot = free_parking_slot
+                    min_distance = json.loads(parking_slot.distances)[entry_index]
+                # if the distances are equal, prioritize assigning small parking slots
+                elif min_distance == distances_arr[entry_index] and parking_slot.parking_slot_size.value > free_parking_slot.parking_slot_size.value:
+                    parking_slot = free_parking_slot
+                    min_distance = json.loads(parking_slot.distances)[entry_index]
+
+            data['parking_slot'] = parking_slot
+            data['vehicle'] = vehicle
 
         return data
+
+    def create(self, validated_data):
+        # save the vehicle if it does not exist yet
+        vehicle_data = validated_data['vehicle']
+        vehicle, _ = models.Vehicle.objects.get_or_create(
+            plate_number = vehicle_data.plate_number,
+            type = vehicle_data.type
+        )
+
+        # create the vehicle parking instance
+        parking_slot = validated_data['parking_slot']
+        vehicle_parking = models.VehicleParking(
+            entry_index = validated_data['entry_index'],
+            parking_slot = parking_slot,
+            vehicle = vehicle
+        )
+        vehicle_parking.save()
+
+        # save the vehicle parking instance in the parking slot
+        parking_slot.vehicle_parking = vehicle_parking
+        parking_slot.save()
+
+        return vehicle_parking
+
+    def update(self, instance, validated_data):
+        # set the exit datetime of the vehicle parking instance
+        instance.exit_datetime = validated_data['exit_datetime']
+        instance.save()
+        
+        parking_slot = self.validated_data['parking_slot']
+        parking_slot.vehicle_parking = None
+        parking_slot.save()
+
+        return instance
 
 # special serializer for assigning a parking slot to vehicles
 class VehicleParkingEntrySerializer(serializers.ModelSerializer):
@@ -92,12 +188,11 @@ class VehicleParkingEntrySerializer(serializers.ModelSerializer):
         read_only_fields = ['id']
 
     def validate(self, data):
-        # make sure that the instances exist in the database
+        # check if the vehicle is already parked
         vehicle = models.Vehicle(
             plate_number=data['plate_number'],
             type=data['type']
         )
-
         entry_index = data['entry_index']
         """
         Get all the empty parking slots
@@ -131,19 +226,25 @@ class VehicleParkingEntrySerializer(serializers.ModelSerializer):
         return data
 
     def save(self):
+        # save the vehicle if it does not exist yet
         vehicle_data = self.validated_data['vehicle']
         vehicle, _ = models.Vehicle.objects.get_or_create(
             plate_number = vehicle_data.plate_number,
             type = vehicle_data.type
         )
 
+        # create the vehicle parking instance
+        parking_slot = self.validated_data['parking_slot']
         vehicle_parking = models.VehicleParking(
             entry_index = self.validated_data['entry_index'],
-            parking_slot = self.validated_data['parking_slot'],
+            parking_slot = parking_slot,
             vehicle = vehicle
         )
-
         vehicle_parking.save()
+
+        # save the vehicle parking instance in the parking slot
+        parking_slot.vehicle_parking = vehicle_parking
+        parking_slot.save()
 
         return {
             "vehicle_parking": vehicle_parking,

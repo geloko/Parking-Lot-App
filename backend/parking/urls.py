@@ -18,6 +18,6 @@ urlpatterns = [
     path('mall_parking_slots/view', views.VehicleParkingViewSet.as_view({'get': 'list'})),
     path('mall_parking_slots/view/<int:pk>', views.VehicleParkingViewSet.as_view({'get': 'retrieve'})),
     path('mall_parking_slots/entry', views.VehicleParkingEntryViewSet.as_view({'post': 'create'})),
-    path('mall_parking_slots/exit', views.VehicleParkingExitViewSet.as_view({'patch': 'partial_update'})),
+    path('mall_parking_slots/exit', views.VehicleParkingViewSet.as_view({'patch': 'partial_update'})),
     re_path(r'', include(router.urls))
 ]

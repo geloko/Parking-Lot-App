@@ -9,4 +9,4 @@ admin.site.register(models.VehicleParking)
 
 @admin.register(models.ParkingSlot)
 class ParkingSlotAdmin(admin.ModelAdmin):
-    list_display = ('id', 'parking_slot_size', 'distances')
+    list_display = ('id', 'parking_slot_size', 'distances', 'vehicle_parking')
