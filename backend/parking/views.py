@@ -63,18 +63,13 @@ class VehicleParkingViewSet(viewsets.GenericViewSet,
 
         serializer = self.serializer_class(instance=vehicle_parking, data=request.data)
         if serializer.is_valid():
-            print("VALIDATED")
             content = serializer.save()
             return Response(content, status=status.HTTP_200_OK)
         else:
             content = serializer.errors
             return Response(content, status=status.HTTP_400_BAD_REQUEST)
 
-class VehicleParkingExitViewSet(viewsets.GenericViewSet,
-):
-    queryset = models.VehicleParking.objects.all()
-    serializer_class = serializers.VehicleParkingSerializer
-
+# viewset for entering vehicles and parking slot assignment
 class VehicleParkingEntryViewSet(viewsets.GenericViewSet, 
     mixins.CreateModelMixin,
 ):
