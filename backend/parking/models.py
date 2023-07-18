@@ -1,4 +1,5 @@
 from django.db import models
+import math
 
 # base information for every entry in the database to determine when things were added and updated
 class BaseInfo(models.Model):
@@ -107,5 +108,10 @@ class VehicleParking(BaseInfo):
             else:
                 # add the fee based on the continuous rate to be applied on a per second basis
                 total_fee += parking_duration * float(slot_rate) / (60 * 60)
+            
+            # add the penalty for exceeding 24 hours
+            if parking_duration >= mall_parking.exceed_duration:
+                total_fee += mall_parking.exceed_rate
 
-        return total_fee
+        # return the rounded up value
+        return math.ceil(total_fee)
