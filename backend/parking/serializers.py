@@ -84,17 +84,18 @@ class VehicleParkingSerializer(serializers.ModelSerializer):
 
 # special serializer for assigning a parking slot to vehicles
 class VehicleParkingEntrySerializer(serializers.ModelSerializer):
-    vehicle = VehicleSerializer()
+    plate_number = serializers.CharField(max_length=255)
+    type = serializers.ChoiceField(choices=models.Vehicle.VehicleType)
     class Meta:
         model = models.VehicleParking
-        fields = ['id', 'entry_index', 'entry_datetime', 'vehicle']
+        fields = ['id', 'entry_index', 'entry_datetime', 'plate_number', 'type']
         read_only_fields = ['id']
 
     def validate(self, data):
         # make sure that the instances exist in the database
         vehicle = models.Vehicle(
-            plate_number=data['vehicle']['plate_number'],
-            type=data['vehicle']['type']
+            plate_number=data['plate_number'],
+            type=data['type']
         )
 
         entry_index = data['entry_index']
@@ -102,7 +103,7 @@ class VehicleParkingEntrySerializer(serializers.ModelSerializer):
         Get all the empty parking slots
         """
         # Get the vehicle parking instances occupied parking slots. Null exit datetime indicate occupied.
-        free_parking_slots = models.ParkingSlot.objects.filter(vehicle_parking=None, parking_slot_size__value__gte=data['vehicle']['type'])
+        free_parking_slots = models.ParkingSlot.objects.filter(vehicle_parking=None, parking_slot_size__value__gte=data['type'])
 
         # use the first free parking slot as the initial value
         parking_slot = free_parking_slots.first()
@@ -131,13 +132,10 @@ class VehicleParkingEntrySerializer(serializers.ModelSerializer):
 
     def save(self):
         vehicle_data = self.validated_data['vehicle']
-        vehicle = models.Vehicle(
+        vehicle, _ = models.Vehicle.objects.get_or_create(
             plate_number = vehicle_data.plate_number,
             type = vehicle_data.type
         )
-
-        if vehicle.DoesNotExist:
-            vehicle.save()
 
         vehicle_parking = models.VehicleParking(
             entry_index = self.validated_data['entry_index'],
