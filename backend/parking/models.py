@@ -49,6 +49,7 @@ class ParkingSlot(BaseInfo):
     mall_parking = models.ForeignKey(MallParking, on_delete=models.CASCADE)
     parking_slot_size = models.ForeignKey(ParkingSlotSize, on_delete=models.CASCADE)
     distances = models.TextField() # array of integers in JSON format
+    vehicle_parking = models.ForeignKey('VehicleParking', null=True, blank=True, on_delete=models.SET_NULL)
 
     def __str__(self) -> str:
         return str(self.pk) + " - " + self.parking_slot_size.__str__()
