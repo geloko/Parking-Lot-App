@@ -133,7 +133,10 @@ class VehicleParkingEntrySerializer(serializers.ModelSerializer):
         read_only_fields = ['id']
 
     def validate(self, data):
-
+        # check if the vehicle is already parked
+        if models.ParkingSlot.objects.filter(vehicle_parking__vehicle__pk=data['plate_number']).exists():
+            raise serializers.ValidationError('A vehicle with the same plate number is already parked.')
+            
         vehicle = models.Vehicle(
             plate_number=data['plate_number'],
             type=data['type']
