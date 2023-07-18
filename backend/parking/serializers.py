@@ -39,8 +39,8 @@ class ParkingSlotSerializer(serializers.ModelSerializer):
     )
     class Meta:
         model = models.ParkingSlot
-        fields = ['id', 'mall_parking', 'parking_slot_size', 'distances']
-        read_only_fields = ['id']
+        fields = ['id', 'mall_parking', 'parking_slot_size', 'distances', 'vehicle_parking']
+        read_only_fields = ['id', 'vehicle_parking']
 
     def validate(self, data):
         # make sure that the instances exist in the database
@@ -84,17 +84,18 @@ class VehicleParkingSerializer(serializers.ModelSerializer):
 
 # special serializer for assigning a parking slot to vehicles
 class VehicleParkingEntrySerializer(serializers.ModelSerializer):
-    vehicle = VehicleSerializer()
+    plate_number = serializers.CharField(max_length=255)
+    type = serializers.ChoiceField(choices=models.Vehicle.VehicleType)
     class Meta:
         model = models.VehicleParking
-        fields = ['id', 'entry_index', 'entry_datetime', 'vehicle']
+        fields = ['id', 'entry_index', 'entry_datetime', 'plate_number', 'type']
         read_only_fields = ['id']
 
     def validate(self, data):
         # make sure that the instances exist in the database
         vehicle = models.Vehicle(
-            plate_number=data['vehicle']['plate_number'],
-            type=data['vehicle']['type']
+            plate_number=data['plate_number'],
+            type=data['type']
         )
 
         entry_index = data['entry_index']
@@ -102,15 +103,7 @@ class VehicleParkingEntrySerializer(serializers.ModelSerializer):
         Get all the empty parking slots
         """
         # Get the vehicle parking instances occupied parking slots. Null exit datetime indicate occupied.
-        occupied_parking_slot_ids = models.VehicleParking.objects.filter(exit_datetime=None).values('parking_slot_id')
-        # filter for parking slots that are too small
-        valid_parking_slots = models.ParkingSlot.objects.filter(parking_slot_size__value__gte=data['vehicle']['type'])
-        free_parking_slots = valid_parking_slots.exclude(id__in=Subquery(occupied_parking_slot_ids))
-        
-        # Querying the empty parking slots like this is computationally expensive. 
-        # An alternative that I have thought of is to have an is_occupied attribute in the ParkingSlot.
-        # However, it is also not fool proof because that might cause inconsistencies in the data if not updated properly, like if an admin modifies it without using the API.
-        # My take is that we could start with a computationally expensive but reliable solution and only switch to an efficient one when necessary.
+        free_parking_slots = models.ParkingSlot.objects.filter(vehicle_parking=None, parking_slot_size__value__gte=data['type'])
 
         # use the first free parking slot as the initial value
         parking_slot = free_parking_slots.first()
@@ -127,6 +120,10 @@ class VehicleParkingEntrySerializer(serializers.ModelSerializer):
             if min_distance > distances_arr[entry_index]:
                 parking_slot = free_parking_slot
                 min_distance = json.loads(parking_slot.distances)[entry_index]
+            # if the distances are equal, prioritize assigning small parking slots
+            elif min_distance == distances_arr[entry_index] and parking_slot.parking_slot_size.value > free_parking_slot.parking_slot_size.value:
+                parking_slot = free_parking_slot
+                min_distance = json.loads(parking_slot.distances)[entry_index]
 
         data['parking_slot'] = parking_slot
         data['vehicle'] = vehicle
@@ -135,13 +132,10 @@ class VehicleParkingEntrySerializer(serializers.ModelSerializer):
 
     def save(self):
         vehicle_data = self.validated_data['vehicle']
-        vehicle = models.Vehicle(
+        vehicle, _ = models.Vehicle.objects.get_or_create(
             plate_number = vehicle_data.plate_number,
             type = vehicle_data.type
         )
-
-        if vehicle.DoesNotExist:
-            vehicle.save()
 
         vehicle_parking = models.VehicleParking(
             entry_index = self.validated_data['entry_index'],
@@ -155,8 +149,6 @@ class VehicleParkingEntrySerializer(serializers.ModelSerializer):
             "vehicle_parking": vehicle_parking,
             "message": "The vehicle has been parked."
         }
-
-        
 
 class MallParkingSlotsSerializer(serializers.Serializer):
     mall_parking = MallParkingSerializer()
