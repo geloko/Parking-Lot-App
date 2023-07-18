@@ -103,6 +103,7 @@ class VehicleParkingEntrySerializer(serializers.ModelSerializer):
         """
         # Get the vehicle parking instances occupied parking slots. Null exit datetime indicate occupied.
         occupied_parking_slot_ids = models.VehicleParking.objects.filter(exit_datetime=None).values('parking_slot_id')
+        # filter for parking slots that are too small
         valid_parking_slots = models.ParkingSlot.objects.filter(parking_slot_size__value__gte=data['vehicle']['type'])
         free_parking_slots = valid_parking_slots.exclude(id__in=Subquery(occupied_parking_slot_ids))
         

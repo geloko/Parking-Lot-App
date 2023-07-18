@@ -13,6 +13,14 @@ class BaseViewSet(viewsets.GenericViewSet,
     mixins.RetrieveModelMixin,
     mixins.UpdateModelMixin
 ):
+    def perform_create(self, serializer): 
+        if(serializer.is_valid()):
+            content = serializer.save()
+            return Response(content, status=status.HTTP_201_CREATED)
+        else:
+            content = serializer.errors
+            return Response(content, status=status.HTTP_400_BAD_REQUEST)
+            
     # disable full object updates so that the requests would always pass through the partial update function
     @swagger_auto_schema(auto_schema=None)
     def update(self):
