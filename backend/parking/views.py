@@ -9,8 +9,8 @@ from . import serializers
 # Base view set for table attributes containing the create, read and update actions but not delete.
 class BaseViewSet(viewsets.GenericViewSet, 
     mixins.ListModelMixin,
-    mixins.CreateModelMixin,
     mixins.RetrieveModelMixin,
+    mixins.CreateModelMixin,
     mixins.UpdateModelMixin
 ):
     def perform_create(self, serializer): 
@@ -26,11 +26,19 @@ class BaseViewSet(viewsets.GenericViewSet,
     def update(self):
         return Response(status=status.HTTP_403_FORBIDDEN)
 
-class MallParkingViewSet(BaseViewSet):
+class MallParkingViewSet(
+    viewsets.GenericViewSet, 
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin
+):
     queryset = models.MallParking.objects.all()
     serializer_class = serializers.MallParkingSerializer
 
-class VehicleViewSet(BaseViewSet):
+class VehicleViewSet(
+    viewsets.GenericViewSet, 
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin
+):
     queryset = models.Vehicle.objects.all()
     serializer_class = serializers.VehicleSerializer
 
