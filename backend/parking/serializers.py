@@ -107,71 +107,16 @@ class VehicleParkingSerializer(serializers.ModelSerializer):
             if self.instance.entry_datetime > data['exit_datetime']:
                 raise serializers.ValidationError('The exit datetime cannot be before the exit datetime.')
         else:
-            # check if the vehicle is already parked
-            vehicle = models.Vehicle(
-                plate_number=data['plate_number'],
-                type=data['type']
-            )
-            entry_index = data['entry_index']
-            """
-            Get all the empty parking slots
-            """
-            # Get the vehicle parking instances occupied parking slots. Null exit datetime indicate occupied.
-            free_parking_slots = models.ParkingSlot.objects.filter(vehicle_parking=None, parking_slot_size__value__gte=data['type'])
-
-            # use the first free parking slot as the initial value
-            parking_slot = free_parking_slots.first()
-
-            if parking_slot is None:
-                raise serializers.ValidationError('No available parking slots.')
-
-            min_distance = json.loads(parking_slot.distances)[entry_index]
-            for free_parking_slot in free_parking_slots:
-                # distances array is saved as a string in json format
-                distances_arr = json.loads(free_parking_slot.distances)
-
-                # set the minimum as the new parking slot and update the current minimum distance
-                if min_distance > distances_arr[entry_index]:
-                    parking_slot = free_parking_slot
-                    min_distance = json.loads(parking_slot.distances)[entry_index]
-                # if the distances are equal, prioritize assigning small parking slots
-                elif min_distance == distances_arr[entry_index] and parking_slot.parking_slot_size.value > free_parking_slot.parking_slot_size.value:
-                    parking_slot = free_parking_slot
-                    min_distance = json.loads(parking_slot.distances)[entry_index]
-
-            data['parking_slot'] = parking_slot
-            data['vehicle'] = vehicle
+            raise serializers.ValidationError('This serializer is only for update requests')
 
         return data
-
-    def create(self, validated_data):
-        # save the vehicle if it does not exist yet
-        vehicle_data = validated_data['vehicle']
-        vehicle, _ = models.Vehicle.objects.get_or_create(
-            plate_number = vehicle_data.plate_number,
-            type = vehicle_data.type
-        )
-
-        # create the vehicle parking instance
-        parking_slot = validated_data['parking_slot']
-        vehicle_parking = models.VehicleParking(
-            entry_index = validated_data['entry_index'],
-            parking_slot = parking_slot,
-            vehicle = vehicle
-        )
-        vehicle_parking.save()
-
-        # save the vehicle parking instance in the parking slot
-        parking_slot.vehicle_parking = vehicle_parking
-        parking_slot.save()
-
-        return vehicle_parking
 
     def update(self, instance, validated_data):
         # set the exit datetime of the vehicle parking instance
         instance.exit_datetime = validated_data['exit_datetime']
         instance.save()
         
+        # remove the parking details from the parking slot
         parking_slot = self.validated_data['parking_slot']
         parking_slot.vehicle_parking = None
         parking_slot.save()
@@ -188,16 +133,14 @@ class VehicleParkingEntrySerializer(serializers.ModelSerializer):
         read_only_fields = ['id']
 
     def validate(self, data):
-        # check if the vehicle is already parked
+
         vehicle = models.Vehicle(
             plate_number=data['plate_number'],
             type=data['type']
         )
         entry_index = data['entry_index']
-        """
-        Get all the empty parking slots
-        """
-        # Get the vehicle parking instances occupied parking slots. Null exit datetime indicate occupied.
+
+        # Get all parking slots that are unoccupied and fits the size of the vehicle
         free_parking_slots = models.ParkingSlot.objects.filter(vehicle_parking=None, parking_slot_size__value__gte=data['type'])
 
         # use the first free parking slot as the initial value
