@@ -70,10 +70,10 @@ class VehicleParking(BaseInfo):
 
             # get the latest vehicle parking instance from the same vehicle
             try:
-                latest_parking = VehicleParking.objects.filter(vehicle__id=self.vehicle.pk).latest('exit_datetime')
+                latest_parking = VehicleParking.objects.filter(vehicle__pk=self.vehicle.pk).exclude(pk=self.pk).latest('exit_datetime')
 
                 # return False if the difference between the last parking and the current entry is less than the return duration threshold
-                if self.entry_datetime.timestamp() - latest_parking.exit_datetime.timestamp() <= mall_parking.return_duration:
+                if latest_parking.exit_datetime.timestamp() - self.entry_datetime.timestamp() <= mall_parking.return_duration:
                     return False
             except VehicleParking.DoesNotExist:
                 # handle the case where there is no pre-existing parking records
@@ -88,6 +88,9 @@ class VehicleParking(BaseInfo):
         if self.exit_datetime is not None:
             # get the mall parking instance to see the corresponding rates for the parking fee
             mall_parking = MallParking.objects.get(id=self.parking_slot.mall_parking.pk)
+            
+            # get the hourly rate from the parking slot depending on the size
+            slot_rate = self.parking_slot.parking_slot_size.continuous_rate
 
             parking_duration = self.exit_datetime.timestamp() - self.entry_datetime.timestamp()
             if self.is_fixed_starting_rate:
@@ -99,13 +102,10 @@ class VehicleParking(BaseInfo):
 
                 # handle the case when the duration exceeds the flat rate duration
                 if non_fixed_rate_duration > 0:
-                    # get the hourly rate from the parking slot depending on the size
-                    slot_rate = self.parking_slot.parking_slot_size.continuous_rate
-
                     # add the fee based on the continuous rate to be applied on a per second basis
-                    total_fee += non_fixed_rate_duration * slot_rate / (60 * 60)
+                    total_fee += non_fixed_rate_duration * float(slot_rate) / (60 * 60)
             else:
                 # add the fee based on the continuous rate to be applied on a per second basis
-                total_fee += parking_duration * slot_rate / (60 * 60)
+                total_fee += parking_duration * float(slot_rate) / (60 * 60)
 
         return total_fee
