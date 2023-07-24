@@ -110,15 +110,8 @@ class MallParkingSlotsViewSet(
     def retrieve(self, request, pk=None):
         mall_parking = models.MallParking.objects.get(pk=pk)
         mall_parking_serializer = serializers.MallParkingSerializer(mall_parking)
-        parking_slots = models.ParkingSlot.objects.all()
-        parking_slots_serializer = serializers.ParkingSlotSerializer(parking_slots, many=True)
-
-        # TODO: Fix bug in passing data for retrieve
 
         return Response(
-            {
-                mall_parking: mall_parking_serializer.data,
-                parking_slots: parking_slots_serializer.data
-            }, 
+            mall_parking_serializer.data,
             status=status.HTTP_200_OK
         )

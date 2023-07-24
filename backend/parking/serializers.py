@@ -44,8 +44,12 @@ class ParkingSlotSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         # make sure that the instances exist in the database
-        mall_parking = models.MallParking.objects.get(id=data['mall_parking'].get['id'])
-        parking_slot_size = models.ParkingSlotSize.objects.get(id=data['parking_slot_size'].get['id'])
+        mall_parking = models.MallParking.objects.get(id=data['mall_parking']['id'])
+        parking_slot_size = models.ParkingSlotSize.objects.get(id=data['parking_slot_size']['id'])
+
+        print("ASDADADASDAS")
+        print(mall_parking)
+        print(parking_slot_size)
 
         data['mall_parking'] = mall_parking
         data['parking_slot_size'] = parking_slot_size
